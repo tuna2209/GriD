@@ -16,6 +16,8 @@ class BaseGeneration extends State<MyHomePage> {
   int lineStroke = 2;
   String lineStrokeLabel = "Nhỏ";
   bool isFirstPick = true;
+  bool isFull = true;
+  double w, h;
 
   Color color = Colors.blue;
 
@@ -28,14 +30,14 @@ class BaseGeneration extends State<MyHomePage> {
     this.painter.setColor(color.value);
   }
 
-  void applyMatrix4(Matrix4 matrix4) {
+  void applyMatrix4(Matrix4 matrix4, Matrix4 m) {
 //    print(matrix4);
     if (isFirstPick) {
       isFirstPick = false;
       original = matrix4;
     }
     this.matrix4.value = matrix4;
-    painter.setMatrix4(matrix4);
+    painter.setMatrix4(m);
   }
 
   void applyCount(int count) {
@@ -92,14 +94,22 @@ class BaseGeneration extends State<MyHomePage> {
       ImageStreamListener(
         (ImageInfo image, bool synchronousCall) {
           var myImage = image.image;
+          bool isFull = true;
           double screenWidth = MediaQuery.of(context).size.width;
           double screenHeight = MediaQuery.of(context).size.height;
           double w = screenWidth;
           double h = screenWidth * myImage.height / myImage.width;
           if (h > screenHeight) {
+            isFull = false;
             h = screenHeight;
             w = h * myImage.width / myImage.height;
           }
+          setState(() {
+            this.isFull = isFull;
+            this.w = w;
+            this.h = h;
+            print(isFull);
+          });
 //          print("imageProperties : w = " + w.toString());
 //          print("imageProperties : h = " + h.toString());
 //          print("imageProperties : s.w = " + screenWidth.toString());
@@ -182,8 +192,8 @@ class MyPainter extends CustomPainter {
       if (value >= 1) {
         p.strokeWidth = this.p.strokeWidth / value;
       } else {
-        p.strokeWidth = this.p.strokeWidth * value;
-//        p.strokeWidth = this.p.strokeWidth;
+//        p.strokeWidth = this.p.strokeWidth * value;
+        p.strokeWidth = this.p.strokeWidth;
       }
     } else {
       p.strokeWidth = this.p.strokeWidth;

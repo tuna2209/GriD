@@ -16,6 +16,7 @@ final double bottomIconSize = 36;
 final double bottomPhotoSize = 154;
 
 class DrawData {
+  String regax = '{!@#}';
   String path;
   int line;
   int stroke;
@@ -29,11 +30,11 @@ class DrawData {
   }
 
   String toString() {
-    return '$path-$line-$stroke-$color';
+    return '$path$regax$line$regax$stroke$regax$color';
   }
 
   void load(String data) {
-    List<String> list = data.split('-');
+    List<String> list = data.split(regax);
     path = list[0];
     line = int.parse(list[1]);
     stroke = int.parse(list[2]);
@@ -51,9 +52,12 @@ Future<List<DrawData>> getImages() async {
   SharedPreferences editor = await SharedPreferences.getInstance();
   Set<String> keys = editor.getKeys();
   for (String key in keys) {
-    DrawData item = new DrawData();
-    item.load(editor.getString(key));
-    data.add(item);
+    try {
+      DrawData item = new DrawData();
+      print(editor.getString(key));
+      item.load(editor.getString(key));
+      data.add(item);
+    } catch (error) {}
   }
   return data;
 }

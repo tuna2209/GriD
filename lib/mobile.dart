@@ -7,6 +7,7 @@ import 'package:double_back_to_close_app/double_back_to_close_app.dart';
 import 'package:draw_cover/util.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart';
+import 'package:image_crop/image_crop.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -37,6 +38,10 @@ class MobileGeneration extends BaseGeneration
   PageController pageController;
   bool result = false;
   bool isOpenPanel = false;
+
+  final cropKey = GlobalKey<CropState>();
+  bool isCrop = false;
+  File cropFile = null;
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +100,9 @@ class MobileGeneration extends BaseGeneration
                 controller: panelController,
                 defaultPanelState: PanelState.CLOSED,
                 panel: image == null ? initPanelNoImage() : initPanel(),
-                body: image == null ? initNoImagePanel() : initImagePanel(),
+                body: isCrop
+                    ? initCropPanel()
+                    : (image == null ? initNoImagePanel() : initImagePanel()),
               ),
             ],
           ),
@@ -106,6 +113,15 @@ class MobileGeneration extends BaseGeneration
           ),
         ),
       ),
+      floatingActionButton: isCrop
+          ? FloatingActionButton(
+              onPressed: cropImage,
+              child: Icon(
+                Icons.crop,
+                color: Colors.white,
+              ),
+            )
+          : Container(),
     );
   }
 
@@ -175,22 +191,21 @@ class MobileGeneration extends BaseGeneration
   Widget initImagePanel() {
     LayoutBuilder builder = new LayoutBuilder(
       builder: (context, constraints) {
-//        var width = screenWidth;
-//        var height = constraints.smallest.height;
-//        MinBoxer boxer = MinBoxer(Rect.fromLTWH(0, 0, width, height),
-//            Offset.zero & constraints.biggest);
+        var width = screenWidth;
+        var height = constraints.smallest.height;
+        MinBoxer boxer = MinBoxer(Rect.fromLTWH(0, 0, width, height),
+            Offset.zero & constraints.biggest);
         return MatrixGestureDetector(
           shouldRotate: false,
-          shouldTranslate: true,
-          shouldScale: true,
-          clipChild: true,
+          clipChild: false,
+
           onMatrixUpdate: (m, tm, sm, rm) {
-//            matrix = MatrixGestureDetector.compose(matrix, tm, sm, null);
-//            boxer.clamp(matrix);
-//            setState(() {
-//              applyMatrix4(matrix);
-//            });
-            applyMatrix4(m);
+            matrix = MatrixGestureDetector.compose(matrix, tm, sm, null);
+            boxer.clamp(matrix);
+            setState(() {
+              applyMatrix4(matrix, m);
+            });
+//            applyMatrix4(m);
           },
           child: AnimatedBuilder(
             animation: matrix4,
@@ -200,11 +215,10 @@ class MobileGeneration extends BaseGeneration
                 child: Stack(
                   children: <Widget>[
                     Container(
-                      padding: EdgeInsets.all(0),
-                      width: double.infinity,
                       child: Image.file(
                         image,
-                        fit: BoxFit.fitWidth,
+                        fit: isFull ? BoxFit.fitWidth : BoxFit.fitHeight,
+                        width: w,
                       ),
                     ),
                     CustomPaint(
@@ -219,6 +233,18 @@ class MobileGeneration extends BaseGeneration
       },
     );
     return builder;
+  }
+
+  Widget initCropPanel() {
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.all(20.0),
+      child: Crop.file(
+        cropFile,
+        key: cropKey,
+        alwaysShowGrid: true,
+      ),
+    );
   }
 
   Future<Widget> getSlideImage(AssetEntity item) async {
@@ -251,8 +277,12 @@ class MobileGeneration extends BaseGeneration
                             color: Color(0xffd9d9d9),
                             child: InkWell(
                               onTap: () async {
-                                File image = await ImageCropper.cropImage(
-                                    sourcePath: images[index].path);
+//                                File image = await ImageCropper.cropImage(
+//                                    sourcePath: images[index].path);
+//                                enableCrop(images[index].path);
+//                                calculatorImage(image);
+
+                                File image = await crop(images[index].path);
                                 calculatorImage(image);
                               },
                               child: Image.file(
@@ -574,15 +604,66 @@ class MobileGeneration extends BaseGeneration
     );
   }
 
+  void cropImage() async {
+//    final sampleFile = await ImageCrop.sampleImage(
+//      file: File(path),
+//      preferredWidth: (screenWidth * 2).toInt(),
+//      preferredHeight: (screenHeight * 2).toInt(),
+//    );
+    File image = await ImageCrop.cropImage(
+      file: cropFile,
+      area: cropKey.currentState.area,
+    );
+    disableCrop();
+//    File image = await ImageCropper.cropImage(sourcePath: origin.path);
+    calculatorImage(image);
+  }
+
+  void enableCrop(String path) {
+    panelController.close();
+    isCrop = true;
+    cropFile = new File(path);
+    setState(() {});
+  }
+
+  void disableCrop() {
+    isCrop = false;
+    cropFile = null;
+    setState(() {});
+  }
+
+  Future<File> crop(String path) async {
+    return await ImageCropper.cropImage(
+      sourcePath: path,
+      aspectRatioPresets: [
+        CropAspectRatioPreset.square,
+        CropAspectRatioPreset.ratio3x2,
+        CropAspectRatioPreset.original,
+        CropAspectRatioPreset.ratio4x3,
+        CropAspectRatioPreset.ratio16x9
+      ],
+      androidUiSettings: AndroidUiSettings(
+        toolbarTitle: 'Chỉnh sửa',
+        initAspectRatio: CropAspectRatioPreset.original,
+        lockAspectRatio: false,
+      ),
+      iosUiSettings: IOSUiSettings(
+        minimumAspectRatio: 1.0,
+      ),
+    );
+  }
+
   Future<Widget> getImageFromCam() async {
     File origin = await ImagePicker.pickImage(source: ImageSource.camera);
-    File image = await ImageCropper.cropImage(sourcePath: origin.path);
+//    enableCrop(origin.path);
+    File image = await crop(origin.path);
     calculatorImage(image);
   }
 
   Future<Widget> getImageFromGallery() async {
     File origin = await ImagePicker.pickImage(source: ImageSource.gallery);
-    File image = await ImageCropper.cropImage(sourcePath: origin.path);
+//    enableCrop(origin.path);
+    File image = await crop(origin.path);
     calculatorImage(image);
   }
 
